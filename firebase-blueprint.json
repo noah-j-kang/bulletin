@@ -1,0 +1,52 @@
+{
+  "entities": {
+    "Note": {
+      "title": "Note",
+      "description": "A spatial note on the bulletin board",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "content": { "type": "string" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "color": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" },
+        "authorId": { "type": "string" },
+        "isGhost": { "type": "boolean" },
+        "isArchived": { "type": "boolean" },
+        "archivedAt": { "type": "number" }
+      },
+      "required": ["id", "content", "x", "y", "color", "createdAt", "updatedAt", "authorId"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile and presence information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "lastActive": { "type": "number" },
+        "cursor": {
+          "type": "object",
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+          }
+        }
+      },
+      "required": ["uid", "lastActive"]
+    }
+  },
+  "firestore": {
+    "/notes/{noteId}": {
+      "schema": "Note",
+      "description": "Global collection of all notes"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User presence and profiles"
+    }
+  }
+}
