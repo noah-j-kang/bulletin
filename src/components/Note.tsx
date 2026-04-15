@@ -87,7 +87,11 @@ const NoteComponent: React.FC<NoteProps> = ({ note }) => {
       )}
 
       <div className="mt-auto pt-2 flex justify-between items-center text-[9px] font-mono text-black/30 uppercase tracking-tighter">
-        <span>{new Date(note.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+        <span>
+          {note.created_at
+            ? new Date(note.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : 'Just now'}
+        </span>
         {note.isGhost && <span className="text-orange-500/60">Ephemeral</span>}
       </div>
     </motion.div>

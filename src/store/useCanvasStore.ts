@@ -1,14 +1,19 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 
+// Update the Note interface at the top of the file:
 export interface Note {
-  id: string; // Supabase uses UUIDs
+  id: string;
   content: string;
   x: number;
   y: number;
-  created_at?: string;
+  created_at?: string; // Supabase default timestamp
   user_id?: string;
+  color?: string; // Used in Note.tsx styling
+  isGhost?: boolean; // Used in Note.tsx for ephemeral UI
 }
+
+// Keep the rest of useCanvasStore.ts the exact same as you currently have it
 
 interface CanvasState {
   notes: Note[];

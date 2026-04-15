@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth, login, logout } from '@/src/lib/supabase';
+import { Session, User } from '@supabase/supabase-js';
+import { supabase, login, logout } from '@/src/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { LogIn, LogOut, User as UserIcon } from 'lucide-react';
 
 interface AuthContextType {
   user: User | null;
+  session: Session | null;
   loading: boolean;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -15,14 +16,27 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(loading => false);
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
     });
-    return unsubscribe;
+
+    // Listen for real-time auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const signIn = async () => {
@@ -73,18 +87,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   }
 
+  // Safely extract metadata from Supabase Google OAuth provider
+  const avatarUrl = user.user_metadata?.avatar_url;
+  const displayName = user.user_metadata?.full_name || user.email;
+
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signOut: signOutUser }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signOut: signOutUser }}>
       <div className="fixed top-6 left-6 z-50 flex items-center gap-3">
         <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm border border-black/5 rounded-full pl-1 pr-4 py-1 shadow-sm">
-          {user.photoURL ? (
-            <img src={user.photoURL} alt={user.displayName || ''} className="w-7 h-7 rounded-full border border-black/5" referrerPolicy="no-referrer" />
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={displayName || ''} className="w-7 h-7 rounded-full border border-black/5" referrerPolicy="no-referrer" />
           ) : (
             <div className="w-7 h-7 rounded-full bg-black/5 flex items-center justify-center">
               <UserIcon className="w-3 h-3 text-black/40" />
             </div>
           )}
-          <span className="text-xs font-medium text-black/60">{user.displayName}</span>
+          <span className="text-xs font-medium text-black/60">{displayName}</span>
         </div>
         <button
           onClick={signOutUser}

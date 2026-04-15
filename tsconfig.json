@@ -21,6 +21,11 @@
       ]
     },
     "allowImportingTsExtensions": true,
-    "noEmit": true
+    "noEmit": true,
+    // Add this specifically to stop the implicit type library errors
+    "types": [
+      "vite/client",
+      "node"
+    ]
   }
 }
