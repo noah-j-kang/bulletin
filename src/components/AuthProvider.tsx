@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth, login, logout } from '@/src/lib/firebase';
+import { auth, login, logout } from '@/src/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { LogIn, LogOut, User as UserIcon } from 'lucide-react';
 
@@ -86,7 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           )}
           <span className="text-xs font-medium text-black/60">{user.displayName}</span>
         </div>
-        <button 
+        <button
           onClick={signOutUser}
           className="p-2 bg-white/80 backdrop-blur-sm border border-black/5 rounded-full shadow-sm hover:bg-red-50 transition-colors group"
           title="Sign Out"

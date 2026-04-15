@@ -1,29 +1,13 @@
 import { create } from 'zustand';
-import { nanoid } from 'nanoid';
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  onSnapshot, 
-  query, 
-  where,
-  serverTimestamp,
-  Timestamp
-} from 'firebase/firestore';
-import { db, auth, handleFirestoreError, OperationType } from '@/src/lib/firebase';
+import { supabase } from '../lib/supabase';
 
 export interface Note {
-  id: string;
+  id: string; // Supabase uses UUIDs
   content: string;
   x: number;
   y: number;
-  color: string;
-  createdAt: number;
-  updatedAt: number;
-  authorId: string;
-  isGhost?: boolean;
+  created_at?: string;
+  user_id?: string;
 }
 
 interface CanvasState {
@@ -31,6 +15,8 @@ interface CanvasState {
   scale: number;
   offset: { x: number; y: number };
   snapToGrid: boolean;
+
+  // Actions
   setNotes: (notes: Note[]) => void;
   addNote: (content: string, x: number, y: number) => Promise<void>;
   updateNote: (id: string, updates: Partial<Note>) => Promise<void>;
@@ -39,59 +25,72 @@ interface CanvasState {
   toggleSnap: () => void;
 }
 
-const COLORS = [
-  '#fef3c7', // Amber 100
-  '#dcfce7', // Green 100
-  '#dbeafe', // Blue 100
-  '#f3e8ff', // Purple 100
-  '#fee2e2', // Red 100
-];
-
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   notes: [],
   scale: 1,
   offset: { x: 0, y: 0 },
   snapToGrid: false,
+
   setNotes: (notes) => set({ notes }),
+
   addNote: async (content, x, y) => {
-    const user = auth.currentUser;
-    if (!user) return;
+    // For creation, we wait for Supabase to generate the definitive UUID
+    // Alternatively, you could generate a UUID client-side for true instant creation
+    const { data, error } = await supabase
+      .from('notes')
+      .insert([{ content, x, y }])
+      .select()
+      .single();
 
-    const id = nanoid();
-    const newNote: Note = {
-      id,
-      content,
-      x,
-      y,
-      color: COLORS[Math.floor(Math.random() * COLORS.length)],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      authorId: user.uid,
-    };
+    if (error) {
+      console.error('Error adding note:', error.message);
+      return;
+    }
 
-    try {
-      await setDoc(doc(db, 'notes', id), newNote);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `notes/${id}`);
+    if (data) {
+      set((state) => ({ notes: [...state.notes, data] }));
     }
   },
+
   updateNote: async (id, updates) => {
-    try {
-      await updateDoc(doc(db, 'notes', id), {
-        ...updates,
-        updatedAt: Date.now(),
-      });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `notes/${id}`);
+    // 1. Optimistic Update: Instantly reflect the change in the UI
+    set((state) => ({
+      notes: state.notes.map((note) =>
+        note.id === id ? { ...note, ...updates } : note
+      ),
+    }));
+
+    // 2. Network Update: Send the change to Supabase in the background
+    const { error } = await supabase
+      .from('notes')
+      .update(updates)
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating note:', error.message);
+      // In a production environment, you would revert the optimistic 
+      // update here if the network request fails.
     }
   },
+
   deleteNote: async (id) => {
-    try {
-      await deleteDoc(doc(db, 'notes', id));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `notes/${id}`);
+    // 1. Optimistic Update: Instantly remove the note from the UI
+    set((state) => ({
+      notes: state.notes.filter((note) => note.id !== id),
+    }));
+
+    // 2. Network Update: Remove from Supabase
+    const { error } = await supabase
+      .from('notes')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting note:', error.message);
     }
   },
+
   setCanvas: (scale, offset) => set({ scale, offset }),
+
   toggleSnap: () => set((state) => ({ snapToGrid: !state.snapToGrid })),
 }));

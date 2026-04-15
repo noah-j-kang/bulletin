@@ -1,27 +1,47 @@
+// src/App.tsx
 import { useEffect } from 'react';
 import { Canvas } from './components/Canvas';
 import { AuthProvider } from './components/AuthProvider';
 import { useCanvasStore } from './store/useCanvasStore';
-import { onSnapshot, collection, query, orderBy } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from './lib/firebase';
+import { supabase } from './lib/supabase';
 
 function BulletinApp() {
   const setNotes = useCanvasStore((state) => state.setNotes);
 
   useEffect(() => {
-    const q = query(collection(db, 'notes'), orderBy('createdAt', 'asc'));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const notesData = snapshot.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id
-      })) as any[];
-      setNotes(notesData);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'notes');
-    });
+    // 1. Fetch initial dataset
+    const fetchNotes = async () => {
+      const { data, error } = await supabase
+        .from('notes')
+        .select('*')
+        .order('created_at', { ascending: true });
 
-    return () => unsubscribe();
+      if (error) {
+        console.error('Error fetching notes:', error);
+        return;
+      }
+      if (data) setNotes(data);
+    };
+
+    fetchNotes();
+
+    // 2. Subscribe to Postgres changes (Real-time)
+    const channel = supabase
+      .channel('public:notes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notes' },
+        (payload) => {
+          // For a frictionless sync, re-fetching is safest, 
+          // or you can optimize by updating Zustand state directly using payload.new/payload.old
+          fetchNotes();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [setNotes]);
 
   return (
